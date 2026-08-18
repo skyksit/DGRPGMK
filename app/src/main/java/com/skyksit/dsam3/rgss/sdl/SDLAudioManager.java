@@ -1,4 +1,4 @@
-package org.libsdl.app;
+package com.skyksit.dsam3.rgss.sdl;
 
 import android.media.AudioFormat;
 import android.media.AudioManager;

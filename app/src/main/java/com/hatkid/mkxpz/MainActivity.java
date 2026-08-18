@@ -21,7 +21,7 @@ import android.util.Log;
 import java.util.Locale;
 import java.io.File;
 
-import org.libsdl.app.SDLActivity;
+import com.skyksit.dsam3.rgss.sdl.SDLActivity;
 import com.hatkid.mkxpz.gamepad.Gamepad;
 import com.hatkid.mkxpz.gamepad.GamepadConfig;
 

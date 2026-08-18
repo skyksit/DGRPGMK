@@ -267,8 +267,15 @@ int main(int argc, char *argv[])
 	jstring strJGamePath = (jstring)env->GetStaticObjectField(cls, fIDGamePath);
 	const char *dataDir = env->GetStringUTFChars(strJGamePath, 0);
 
-	// Request storage permission (before Android 11)
-	if (sdkVersion < 30) {
+	// Request storage permission (before Android 11).
+	// Skip when GAME_PATH is inside the app-internal storage (e.g. hosted in dsam3
+	// where games live under filesDir) — no permission is needed there and the
+	// dialog would only confuse the user.
+	const char *internalPath = SDL_AndroidGetInternalStoragePath();
+	bool gamePathIsInternal =
+		internalPath && strncmp(dataDir, "/data/", 6) == 0;
+
+	if (sdkVersion < 30 && !gamePathIsInternal) {
 		if (!SDL_AndroidRequestPermission("android.permission.WRITE_EXTERNAL_STORAGE")) {
 			showInitError("Failed to get external storage. Please check the app permissions.");
 			SDL_Quit();

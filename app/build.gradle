@@ -8,7 +8,8 @@ android {
 
     defaultConfig {
         applicationId "com.hatkid.mkxpz"
-        minSdk 23
+        // 29: dsam3 통합 타깃과 정렬 (네이티브도 android-29 로 빌드됨 — Application.mk)
+        minSdk 29
         targetSdk 33
         versionCode 11
         versionName "0.1.1"
@@ -48,7 +49,8 @@ android {
             path "jni/Android.mk"
         }
     }
-    ndkVersion '23.2.8568313'
+    // r27+: APP_SUPPORT_FLEXIBLE_PAGE_SIZES (16KB 페이지) 지원 필수
+    ndkVersion '27.2.12479018'
 }
 
 dependencies {

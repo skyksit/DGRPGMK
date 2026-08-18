@@ -20,7 +20,8 @@ jobs:
     runs-on: ubuntu-22.04
 
     env:
-      ANDROID_NDK_VERSION: 23.2.8568313
+      # r27+: 16KB 페이지 정렬(APP_SUPPORT_FLEXIBLE_PAGE_SIZES) 지원 — dsam3(targetSdk 36) 통합 요건
+      ANDROID_NDK_VERSION: 27.2.12479018
       RUBY_VERSION: "3.1"
 
     steps:
@@ -82,17 +83,26 @@ jobs:
           chmod +x make_xxd.sh
           ./make_xxd.sh
 
-      # ── 8. Compile native dependencies (arm64-v8a) ───────────────────────────
+      # ── 8. Compile native dependencies ───────────────────────────────────────
+      # 16KB 페이지 링크 플래그는 Makefile 의 LDFLAGS/CMAKE_SHARED_LINKER_FLAGS 에 내장
+      # (env 로 넘기면 Makefile 의 := 대입에 밀려 무시된다)
       - name: Compile native deps — arm64-v8a (64-bit)
         working-directory: app/jni
         run: |
           HOST=aarch64-linux-android \
           TARGET=aarch64-linux-android \
           ABI=arm64-v8a \
-          LDFLAGS="-Wl,-z,max-page-size=16384" \
           make -j$(nproc)
           # Asegurar mapeo de carpetas por si acaso
           if [ -d "build-arm64-v8a" ] && [ ! -d "build-arm64" ]; then ln -s build-arm64-v8a build-arm64; fi
+
+      - name: Compile native deps — armeabi-v7a (32-bit)
+        working-directory: app/jni
+        run: |
+          HOST=armv7a-linux-androideabi \
+          TARGET=arm-linux-androideabi \
+          ABI=armeabi-v7a \
+          make -j$(nproc)
 
       # ── 9. Make Gradle wrapper executable ────────────────────────────────────
       - name: Grant execute permission for gradlew
@@ -116,6 +126,49 @@ jobs:
             -Pandroid.suppressUnsupportedCompileSdk=34 \
             --no-daemon \
             --stacktrace
+
+      # ── 11.5. Package native-lib bundles for dsam3 (RPGMK console) ───────────
+      # dsam3 는 {STORE}/cores/1.0/{abi}/libmkxpz-bundle.zip 을 내려받아
+      # filesDir/cores/rgss/ 에 해제한 뒤 System.load 로 로드한다 (MkxpActivity).
+      # universal APK 의 lib/{abi}/ 전체(.so 8개: SDL2*, openal, ruby, mkxp-z, c++_shared)를
+      # ABI별 zip 으로 묶는다 — APK 가 싣는 것 == 앱이 필요로 하는 것.
+      - name: Package libmkxpz-bundle per ABI
+        run: |
+          APK=$(find app/build/outputs/apk/release -name "*universal*.apk" | head -1)
+          if [ -z "$APK" ]; then APK=$(find app/build/outputs/apk/release -name "*.apk" | head -1); fi
+          mkdir -p bundle-work
+          unzip -q "$APK" 'lib/*' -d bundle-work
+          for ABI in arm64-v8a armeabi-v7a; do
+            if [ -d "bundle-work/lib/$ABI" ]; then
+              mkdir -p "bundles/$ABI"
+              (cd "bundle-work/lib/$ABI" && zip -q "$GITHUB_WORKSPACE/bundles/$ABI/libmkxpz-bundle.zip" *.so)
+              echo "── $ABI bundle contents:"
+              unzip -l "bundles/$ABI/libmkxpz-bundle.zip"
+            fi
+          done
+
+      - name: Verify 16KB page alignment
+        run: |
+          TOOLCHAIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          FAIL=0
+          for SO in bundle-work/lib/arm64-v8a/*.so; do
+            # LOAD 세그먼트 정렬이 0x4000(16KB) 이상인지 확인
+            ALIGNS=$("$TOOLCHAIN/llvm-readelf" -lW "$SO" | awk '/LOAD/ {print $NF}')
+            for A in $ALIGNS; do
+              if [ $((A)) -lt $((0x4000)) ]; then
+                echo "::error::$SO has LOAD alignment $A (< 16KB)"
+                FAIL=1
+              fi
+            done
+          done
+          exit $FAIL
+
+      - name: Upload native-lib bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: libmkxpz-bundles
+          path: bundles/
+          retention-days: 30
 
       # ── 12. Sign APK (optional — uses secrets when available) ─────────────────
       - name: Sign APK

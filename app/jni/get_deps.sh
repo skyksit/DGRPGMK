@@ -65,6 +65,22 @@ if [[ ! -d "SDL2" ]]; then
   git clone $GIT_ARGS -b release-2.26.3 https://github.com/libsdl-org/SDL SDL2
 fi
 
+# Patch SDL2 Java binding package: org.libsdl.app -> com.skyksit.dsam3.rgss.sdl
+# The Java-side classes live in app/src/main/java/com/skyksit/dsam3/rgss/sdl/ so that
+# they can coexist with dsam3's SDL3 org.libsdl.app layer in one APK (dex-level FQCN clash).
+# SDL_android.c defines SDL_JAVA_PREFIX unconditionally (no #ifndef guard), and
+# src/hidapi/android/hid.cpp has its own copy, so -D flags cannot override it — patch sources.
+# Idempotent: grep finds nothing on an already-patched tree.
+if [[ -d "SDL2" ]]; then
+  SDL2_PATCH_FILES=$(grep -rl 'org_libsdl_app\|org/libsdl/app' SDL2/src SDL2/include 2>/dev/null || true)
+  if [[ -n "$SDL2_PATCH_FILES" ]]; then
+    echo "Patching SDL2 Java package prefix (org.libsdl.app -> com.skyksit.dsam3.rgss.sdl)..."
+    echo "$SDL2_PATCH_FILES" | xargs sed -i \
+      -e 's|org_libsdl_app|com_skyksit_dsam3_rgss_sdl|g' \
+      -e 's|org/libsdl/app|com/skyksit/dsam3/rgss/sdl|g'
+  fi
+fi
+
 # SDL2_image
 if [[ ! -d "SDL2_image" ]]; then
   echo "Downloading SDL2_image..."
