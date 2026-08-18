@@ -156,9 +156,12 @@ pixman: init cpufeatures $(LIBDIR)/libpixman-1.a
 $(LIBDIR)/libpixman-1.a: pixman/Makefile
 	cd pixman; make -j$(NPROC); make install
 
+# -fno-integrated-as 제거: NDK r24+ 는 GNU as 가 없어 이 플래그가 있으면
+# configure 의 컴파일 테스트부터 실패한다 ("C compiler cannot create executables").
+# clang 통합 어셈블러로 pixman 0.42 ARM asm 빌드에 문제 없음.
 pixman/Makefile: pixman/configure
 	cd pixman; $(CONFIGURE_ENV) \
-	CFLAGS="$(CFLAGS) -fno-integrated-as -I$(NDK)/sources/android/cpufeatures" \
+	CFLAGS="$(CFLAGS) -I$(NDK)/sources/android/cpufeatures" \
 	LDFLAGS="$(LDFLAGS) -lcpufeatures" \
 	./configure $(CONFIGURE_ARGS) --enable-static=true --enable-shared=false
 
