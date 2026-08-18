@@ -101,13 +101,15 @@ if [[ ! -d "SDL2_ttf" ]]; then
   git clone $GIT_ARGS --recurse-submodules -b release-2.20.2 https://github.com/libsdl-org/SDL_ttf SDL2_ttf
 fi
 
-# harfbuzz hb-ft.cc: FT_Generic_Finalizer 캐스트가 clang 17+(NDK r26/r27)의
-# -Wcast-function-type-strict 에 걸려 -Werror 로 빌드가 죽는다 (harfbuzz upstream 은
-# 함수 시그니처를 고쳐 해결). 파일 단위 pragma 로 해당 경고만 억제한다. 멱등.
-HB_FT="SDL2_ttf/external/harfbuzz/src/hb-ft.cc"
-if [[ -f "$HB_FT" ]] && ! grep -q 'Wcast-function-type-strict' "$HB_FT"; then
-  echo "Patching harfbuzz hb-ft.cc (-Wcast-function-type-strict suppress)..."
-  sed -i '1i #if defined(__clang__)\n#pragma clang diagnostic ignored "-Wunknown-warning-option"\n#pragma clang diagnostic ignored "-Wcast-function-type-strict"\n#endif' "$HB_FT"
+# harfbuzz: hb.hh 가 "#pragma GCC diagnostic error -Wcast-function-type" 으로 경고를
+# 에러로 승격시키는데, clang 16+(NDK r26/r27)에선 -strict 하위 그룹까지 포함되어
+# hb-ft.cc 의 FT_Generic_Finalizer 캐스트가 빌드를 죽인다 (upstream 은 8.x 에서
+# 콜백 시그니처를 고쳐 해결). include 시점에 재승격되므로 hb-ft.cc 쪽 pragma 로는
+# 못 막고, hb.hh 의 해당 pragma 자체를 ignored 로 바꾼다. 멱등.
+HB_HH="SDL2_ttf/external/harfbuzz/src/hb.hh"
+if [[ -f "$HB_HH" ]] && grep -q 'diagnostic error *"-Wcast-function-type"' "$HB_HH"; then
+  echo "Patching harfbuzz hb.hh (-Wcast-function-type error -> ignored)..."
+  sed -i 's|diagnostic error\( *\)"-Wcast-function-type"|diagnostic ignored\1"-Wcast-function-type"|' "$HB_HH"
 fi
 
 # SDL2_sound
