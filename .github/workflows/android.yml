@@ -99,6 +99,10 @@ jobs:
       - name: Compile native deps — armeabi-v7a (32-bit)
         working-directory: app/jni
         run: |
+          # 두 번째 ABI 필수 클린: deps 는 소스 트리 안(in-tree)에서 configure 되므로
+          # arm64 빌드가 남긴 Makefile/오브젝트가 그대로 재사용되어 v7a 산출물이
+          # build-armeabi-v7a/ 에 설치되지 않는다 (installed 라이브러리는 소스 밖이라 보존됨)
+          make clean || true
           HOST=armv7a-linux-androideabi \
           TARGET=arm-linux-androideabi \
           ABI=armeabi-v7a \
