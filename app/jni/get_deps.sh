@@ -79,6 +79,14 @@ if [[ -d "SDL2" ]]; then
       -e 's|org_libsdl_app|com_skyksit_dsam3_rgss_sdl|g' \
       -e 's|org/libsdl/app|com/skyksit/dsam3/rgss/sdl|g'
   fi
+
+  # NDK r27 은 ALooper_pollAll 을 컴파일 에러로 막는다 (r26 에서 deprecated).
+  # SDL 2.30 의 upstream 수정과 동일하게 ALooper_pollOnce 로 교체 (시그니처 동일).
+  SDL2_LOOPER_FILES=$(grep -rl 'ALooper_pollAll' SDL2/src 2>/dev/null || true)
+  if [[ -n "$SDL2_LOOPER_FILES" ]]; then
+    echo "Patching SDL2 ALooper_pollAll -> ALooper_pollOnce (NDK r27)..."
+    echo "$SDL2_LOOPER_FILES" | xargs sed -i 's|ALooper_pollAll|ALooper_pollOnce|g'
+  fi
 fi
 
 # SDL2_image
