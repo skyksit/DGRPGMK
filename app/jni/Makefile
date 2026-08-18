@@ -156,14 +156,18 @@ pixman: init cpufeatures $(LIBDIR)/libpixman-1.a
 $(LIBDIR)/libpixman-1.a: pixman/Makefile
 	cd pixman; make -j$(NPROC); make install
 
-# -fno-integrated-as 제거: NDK r24+ 는 GNU as 가 없어 이 플래그가 있으면
-# configure 의 컴파일 테스트부터 실패한다 ("C compiler cannot create executables").
-# clang 통합 어셈블러로 pixman 0.42 ARM asm 빌드에 문제 없음.
+# NDK r24+ 는 GNU as 가 없다:
+#  - -fno-integrated-as 는 configure 컴파일 테스트부터 실패시킴 ("cannot create executables")
+#  - pixman 의 ARM/AArch64 NEON .S 는 GAS 전용 매크로 문법(%(expr) 등)이라 clang 통합
+#    어셈블러로 어셈블 불가 ("expected absolute expression")
+# → ARM 어셈블리 최적화를 끄고 C 폴백으로 빌드한다. mkxp-z 렌더링은 GL 경로라
+#   pixman 은 Bitmap CPU 연산에만 쓰여 성능 영향 제한적.
 pixman/Makefile: pixman/configure
 	cd pixman; $(CONFIGURE_ENV) \
 	CFLAGS="$(CFLAGS) -I$(NDK)/sources/android/cpufeatures" \
 	LDFLAGS="$(LDFLAGS) -lcpufeatures" \
-	./configure $(CONFIGURE_ARGS) --enable-static=true --enable-shared=false
+	./configure $(CONFIGURE_ARGS) --enable-static=true --enable-shared=false \
+	--disable-arm-simd --disable-arm-neon --disable-arm-a64-neon
 
 pixman/configure: pixman/configure.ac
 	cd pixman; autoreconf -i
