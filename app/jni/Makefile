@@ -78,7 +78,10 @@ endif
 # max-page-size=16384: 16KB 페이지 기기 호환 (Android 15+). ndk-build 쪽은
 # Application.mk 의 APP_SUPPORT_FLEXIBLE_PAGE_SIZES 가 처리하고, 여기(오토툴즈/CMake로
 # 빌드되는 libruby.so/libopenal.so)는 이 플래그가 유일한 적용 경로다.
-CFLAGS      := -O0 $(CROSSFLAGS) --sysroot=$(TOOLCHAIN)/sysroot -I$(TOOLCHAIN)/sysroot/usr/include -I$(INCDIR)
+# -fPIC: static archive(pixman/iconv 등)도 최종적으로 libmkxp-z.so(shared)에 링크된다.
+# static 전용 libtool 빌드는 PIC 를 안 붙여 non-PIC TLS(local-exec) 오브젝트가 생기고,
+# ld.lld 가 "R_AARCH64_TLSLE_* cannot be used with -shared" 로 거부한다 (pixman fast_path_cache).
+CFLAGS      := -O0 -fPIC $(CROSSFLAGS) --sysroot=$(TOOLCHAIN)/sysroot -I$(TOOLCHAIN)/sysroot/usr/include -I$(INCDIR)
 LDFLAGS     := -L$(LIBDIR) -lm -lz -Wl,-z,max-page-size=16384
 CLANG_FLAGS := -target $(TARGET) --gcc-toolchain $(TOOLCHAIN)
 
