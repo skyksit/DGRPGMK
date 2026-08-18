@@ -101,6 +101,15 @@ if [[ ! -d "SDL2_ttf" ]]; then
   git clone $GIT_ARGS --recurse-submodules -b release-2.20.2 https://github.com/libsdl-org/SDL_ttf SDL2_ttf
 fi
 
+# harfbuzz hb-ft.cc: FT_Generic_Finalizer 캐스트가 clang 17+(NDK r26/r27)의
+# -Wcast-function-type-strict 에 걸려 -Werror 로 빌드가 죽는다 (harfbuzz upstream 은
+# 함수 시그니처를 고쳐 해결). 파일 단위 pragma 로 해당 경고만 억제한다. 멱등.
+HB_FT="SDL2_ttf/external/harfbuzz/src/hb-ft.cc"
+if [[ -f "$HB_FT" ]] && ! grep -q 'Wcast-function-type-strict' "$HB_FT"; then
+  echo "Patching harfbuzz hb-ft.cc (-Wcast-function-type-strict suppress)..."
+  sed -i '1i #if defined(__clang__)\n#pragma clang diagnostic ignored "-Wunknown-warning-option"\n#pragma clang diagnostic ignored "-Wcast-function-type-strict"\n#endif' "$HB_FT"
+fi
+
 # SDL2_sound
 if [[ ! -d "SDL2_sound" ]]; then
   echo "Downloading SDL2_sound..."
